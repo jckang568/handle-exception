@@ -369,6 +369,8 @@ public class ProductController {
 - Spring 내부의 예외를 처리하는 것이 어려움
 - 예외가 WAS까지 전달되고, WAS의 에러 요청 전달이 진행됨
 
+---
+
 #### 3.3.3. @ExceptionHandler
 @ExceptionHandler는 매우 유연하게 에러를 처리할 수 있는 방법을 제공하는 기능이다.
 @ExceptionHandler는 다음에 어노테이션을 추가함으로써 에러를 손쉽게 처리할 수 있다.
@@ -456,8 +458,235 @@ ExceptionHandler의 파라미터로 HttpServletRequest나 WebRequest 등을 얻�
 하지만 컨트롤러에 에러 처리 코드가 섞이며, 에러 처리 코드가 중복될 가능성이 높다.
 그래서 스프링은 전역적으로 예외를 처리할 수 있는 좋은 기술을 제공해준다.
 
+---
 
+#### 3.3.4. ControllerAdvice와 RestControllerAdvice
+예외 처리는 robust한 애플리케이션을 만드는데 매우 중요한 부분을 차지한다. Spring 프레임워크는 매우 다양한 에러 처리 방법을 제공하는데, 앞선 포스팅에서 @RestControllerAdvice를 사용해야 하는 이유에 대해서 자세히 알아보았다.
 
+이후에는 @RestControllerAdvice를 이용해 에러를 처리하는 방법에 대해서 구현하면서 살펴보도록 하자.
+
+---
+
+- 3.3.4.1. ControllerAdvice와 RestControllerAdvice
+  - Spring은 전역적으로 예외를 처리할 수 있는 @ControllerAdvice와 @RestControllerAdvice 어노테이션을 각각 Spring3.2, Spring4.3부터 제공하고 있다. 두 개의 차이는 @Controller와 RestController와 같은데, @RestControllerAdvice는 @ControllerAdvice와 달리 @ResponseBody가 붙어 있어 응답을 Json으로 내려준다는 점에서 다르다.
+  ```java
+    @Target(ElementType.TYPE)
+    @Retention(RetentionPolicy.RUNTIME)
+    @Documented
+    @ControllerAdvice
+    @ResponseBody
+    public @interface RestControllerAdvice {
+    /*...*/
+    }
+        
+    @Target(ElementType.TYPE)
+    @Retention(RetentionPolicy.RUNTIME)
+    @Documented
+    @Component
+    public @interface ControllerAdvice {
+    /*...*/
+    }
+    ```
+  - ControllerAdvice는 여러 컨트롤러에 대해 전역적으로 ExceptionHandler를 적용해준다. 위에서 보이듯 ControllerAdvice 어노테이션에는 @Component 어노테이션이 있어서 ControllerAdvice가 선언된 클래스는 스프링 빈으로 등록된다. 그러므로 우리는 다음과 같이 전역적으로 에러를 핸들링하는 클래스를 만들어 어노테이션을 붙여줌으로써 에러 처리를 위임할 수 있다.
+  ```java
+    @RestControllerAdvice
+    public class GlobalExceptionHandler {
+    
+        @ExceptionHandler(NoSuchElementFoundException.class)
+        protected ResponseEntity<?> handleIllegalArgumentException(NoSuchElementFoundException e) {
+            final ErrorResponse errorResponse = ErrorResponse.builder()
+                    .code("Item Not Found")
+                    .message(e.getMessage()).build();
+    
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
+        }
+    }
+    ```
+  - 우리는 이러한 ControllerAdvice를 이용함으로써 다음과 같은 이점을 누릴 수 있다.    
+    - 하나의 클래스로 모든 컨트롤러에 대해 전역적으로 예외 처리가 가능함
+    - 직접 정의한 에러 응답을 일관성있게 클라이언트에게 내려줄 수 있음
+    - 별도의 try-catch문이 없어 코드의 가독성이 높아짐
+  - 이러한 이유로 API에 의한 예외 처리를 할 때에는 ControllerAdvice를 이용하면 평가된다. 하지만 ControllerAdvice를 사용할 때에는 항상 다음의 내용들을 주의해야 한다. 여러 ControllerAdvice가 있을 때 @Order 어노테이션으로 순서를 지정하지 않는다면 Spring은 ControllerAdvice를 임의의 순서로 에러를 처리할 수 있다. 그러므로 일관된 예외 응답을 위해서는 이러한 점에 주의해야 한다.
+    - 한 프로젝트당 하나의 ControllerAdvice만 관리하는 것이 좋다.
+    - 만약 여러 ControllerAdvice가 필요하다면 basePackages나 annotations 등을 지정해야 한다.
+    - 직접 구현한 Exception 클래스들은 한 공간에서 관리한다.
+---
+- 3.3.4.2. @RestControllerAdvice를 이용한 Spring 예외 처리 방법
+  - 에러코드 정의하기\
+    먼저 우리가 클라이언트에게 보내줄 에러 코드를 정의해야 한다. 기본적으로 에러 이름과 HTTP 상태 및 메세지를 가지고 있는 에러 코드 클래스를 만들어 보도록 하자. 에러 코드는 애플리케이션에서 전역적으로 사용되는 CommonErrorCode와 특정 도메인에 대해 구체적으로 내려가는 UserErrorCode로 나누고, 인터페이스를 이용해 추상화하도록 하자.
+    먼저 다음과 같이 CommonErrorCode와 UserErrorCode의 공통 메소드로 추상화할 인터페이스를 정의할 수 있다.
+    ```java
+    public interface ErrorCode {
+
+    String name();
+    HttpStatus getHttpStatus();
+    String getMessage();
+
+    }
+    ```
+    그리고 발생할 수 있는 에러 코드를 다음과 같이 정의할 수 있다.
+    ```java
+    @Getter
+    @RequiredArgsConstructor
+    public enum CommonErrorCode implements ErrorCode {
+    
+        INVALID_PARAMETER(HttpStatus.BAD_REQUEST, "Invalid parameter included"),
+        RESOURCE_NOT_FOUND(HttpStatus.NOT_FOUND, "Resource not exists"),
+        INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "Internal server error"),
+        ;
+    
+        private final HttpStatus httpStatus;
+        private final String message;
+    }
+    
+    @Getter
+    @RequiredArgsConstructor
+    public enum UserErrorCode implements ErrorCode {
+    
+        INACTIVE_USER(HttpStatus.FORBIDDEN, "User is inactive"),
+        ;
+    
+        private final HttpStatus httpStatus;
+        private final String message;
+    }
+    ```
+    추가적으로 위의 예외에서는 @Valid를 사용했을 때 에러가 발생한 경우 어느 필드에서 에러가 발생했는지
+    응답을 위한 ValidationError를 내부 정적 클래스로 추가해두었다. 또한 만약 errors가 없다면 응답으로
+    내려가지 않도록 @JsonInclude 어노테이션을 추가하였다.
+
+---
+
+- 3.3.4.3. @RestControllerAdvice 구현하기
+    - 이제 전역적으로 에러를 처리해주는 @RestControllerAdvice 클래스를 추가해주어야 한다.
+    Spring은 스프링 예외를 미리 처리해둔 ResponseEntityExceptionHandler를 추상 클래스로 제공하고 있다.
+    ResponseEntityExceptionHandler에는 스프링 예외에 대한 ExceptionHandler가 모두 구현되어 있으므로
+    ControllerAdvice 클래스가 이를 상속받게 하면 된다. 하지만 에러 메세지는 반환하지 않으므로 스프링 예외에
+    대한 에러 응답을 보내려면 아래 메소드를 오버라이딩 해야 한다.
+    ```java
+    public abstract class ResponseEntityExceptionHandler {
+        /*...*/
+    
+        protected ResponseEntity<Object> handleExceptionInternal(
+            Exception ex, @Nullable Object body, HttpHeaders headers, HttpStatus status, WebRequest request){
+                
+            /*...*/
+        }
+    }
+    ```
+  - 이제 우리가 만든 RestApiException 예외와 @Valid에 의한 유효성 검증에 실패했을 때 발생하는 IllegalArgumentException
+  예외와 마지막으로 잘못된 파라미터를 넘겼을 경우 발생하는 IllegalArgumentException 에러를 처리해주도록 하자.
+  (아래의 코드는 예시 코드이므로, 상황에 맞게 최적화 및 커스터마이징 해주도록 하자.)
+
+  ```java
+  @RestControllerAdvice
+  @Slf4j
+  public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
+    
+      @ExceptionHandler(RestApiException.class)
+      public ResponseEntity<Object> handleCustomException(RestApiException e) {
+          ErrorCode errorCode = e.getErrorCode();
+          return handleExceptionInternal(errorCode);
+      }
+    
+      @ExceptionHandler(IllegalArgumentException.class)
+      public ResponseEntity<Object> handleIllegalArgument(IllegalArgumentException e) {
+          log.warn("handleIllegalArgument", e);
+          ErrorCode errorCode = CommonErrorCode.INVALID_PARAMETER;
+          return handleExceptionInternal(errorCode, e.getMessage());
+      }
+    
+      @Override
+      public ResponseEntity<Object> handleMethodArgumentNotValid(
+              MethodArgumentNotValidException e,
+              HttpHeaders headers,
+              HttpStatus status,
+              WebRequest request) {
+          log.warn("handleIllegalArgument", e);
+          ErrorCode errorCode = CommonErrorCode.INVALID_PARAMETER;
+          return handleExceptionInternal(e, errorCode);
+      }
+    
+      @ExceptionHandler({Exception.class})
+      public ResponseEntity<Object> handleAllException(Exception ex) {
+          log.warn("handleAllException", ex);
+          ErrorCode errorCode = CommonErrorCode.INTERNAL_SERVER_ERROR;
+          return handleExceptionInternal(errorCode);
+      }
+    
+      private ResponseEntity<Object> handleExceptionInternal(ErrorCode errorCode) {
+          return ResponseEntity.status(errorCode.getHttpStatus())
+                  .body(makeErrorResponse(errorCode));
+      }
+    
+      private ErrorResponse makeErrorResponse(ErrorCode errorCode) {
+          return ErrorResponse.builder()
+                  .code(errorCode.name())
+                  .message(errorCode.getMessage())
+                  .build();
+      }
+    
+      private ResponseEntity<Object> handleExceptionInternal(ErrorCode errorCode, String message) {
+          return ResponseEntity.status(errorCode.getHttpStatus())
+                  .body(makeErrorResponse(errorCode, message));
+      }
+    
+      private ErrorResponse makeErrorResponse(ErrorCode errorCode, String message) {
+          return ErrorResponse.builder()
+                  .code(errorCode.name())
+                  .message(message)
+                  .build();
+      }
+    
+      private ResponseEntity<Object> handleExceptionInternal(BindException e, ErrorCode errorCode) {
+          return ResponseEntity.status(errorCode.getHttpStatus())
+                  .body(makeErrorResponse(e, errorCode));
+      }
+    
+      private ErrorResponse makeErrorResponse(BindException e, ErrorCode errorCode) {
+          List<ErrorResponse.ValidationError> validationErrorList = e.getBindingResult()
+                  .getFieldErrors()
+                  .stream()
+                  .map(ErrorResponse.ValidationError::of)
+                  .collect(Collectors.toList());
+    
+          return ErrorResponse.builder()
+                  .code(errorCode.name())
+                  .message(errorCode.getMessage())
+                  .errors(validationErrorList)
+                  .build();
+      }
+  }
+  ```
+  - RestApiException 예외와 IllegalArgumentException의 경우에는 이를 캐치해서 핸들링하는 @ExceptionHandler를 구현해주면
+  되었다. 하지만 @Valid에 의한 MethodArgumentNotValidException의 경우에는 에러 필드와 메세지를 추가해주어야 하는데,
+  관련 정보는 MethodArgumentNotValidException의 getBindingResult를 통해서 얻을 수 있다.
+  - 이제 실제로 우리가 원하는 대로 에러 응답이 내려오는지 확인할 차례이다. 이를 위해 다음과 같은 컨트롤러를 구현해보도록 하자.
+  ```java
+  @RestController
+  @RequiredArgsConstructor
+  public class UserController {
+  
+      @GetMapping("/users/{id}")
+      public ResponseEntity<User> getUser() {
+          throw new RestApiException(UserErrorCode.INACTIVE_USER);
+      }
+  }
+  ```
+  - 그리고 해당 API를 호출해보면 다음과 같이 우리가 원하는 대로 에러 응답이 내려오는 것을 확인할 수 있다.
+  ```json
+  {
+    "code":"INACTIVE_USER",
+    "message":"User is inactive"
+  }
+  ```
+
+---
+### 참고 링크
+  - https://mangkyu.tistory.com/152
+  - https://mangkyu.tistory.com/204
+  - https://mangkyu.tistory.com/205
+
+---
 
 ```mermaid
 flowchart LR

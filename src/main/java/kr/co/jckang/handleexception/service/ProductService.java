@@ -13,11 +13,6 @@ import java.sql.SQLException;
 public class ProductService {
 
     public ResponseEntity<String> getProduct(String id) {
-        BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
-
-        System.out.println();
-
-
         int result = Integer.parseInt(id);
         if (result > 0) {
             return ResponseEntity.ok("bigger than zero");

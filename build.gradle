@@ -17,11 +17,14 @@ repositories {
 
 dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-aop'
+    implementation 'org.springframework:spring-aop'
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     implementation      'org.projectlombok:lombok'
     testImplementation  'org.projectlombok:lombok'
     annotationProcessor     'org.projectlombok:lombok'
     testAnnotationProcessor 'org.projectlombok:lombok'
+    runtimeOnly 'org.aspectj:aspectjweaver:1.9.20.1'
 }
 
 tasks.named('test', Test) {

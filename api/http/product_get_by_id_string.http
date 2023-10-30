@@ -1,4 +1,4 @@
 < {%
-    request.variables.set("id", "2")
+    request.variables.set("id", "asdf")
 %}
 GET http://localhost:8080/product/{{id}}

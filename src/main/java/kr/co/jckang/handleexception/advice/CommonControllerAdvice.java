@@ -1,4 +1,4 @@
-package kr.co.jckang.handleexception.exception;
+package kr.co.jckang.handleexception.advice;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
