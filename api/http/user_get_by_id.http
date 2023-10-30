@@ -1,0 +1,5 @@
+< {%
+    request.variables.set("id", "2")
+%}
+GET http://localhost:8080/users/{{id}}
+

@@ -1,4 +1,2 @@
-< {%
-    request.variables.set("id", "asdf")
-%}
-GET http://localhost:8080/product/{{id}}
+GET http://localhost:8080/product/1
+Accept: application/json

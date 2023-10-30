@@ -1,0 +1,17 @@
+server:
+  servlet:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+  error:
+    include-message: always
+    include-binding-errors: always
+    include-stacktrace: always
+    include-exception: false
+
+logging:
+  level:
+    root: trace
+    org.apache.tomcat: INFO
+    org.apache.tomcat.util.net: WARN
