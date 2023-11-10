@@ -1,5 +1,11 @@
 < {%
-    request.variables.set("id", "2")
+    request.variables.set("id", encodeURI("2"))
 %}
-GET http://localhost:8080/users/{{id}}
-
+GET http://localhost:8080/users/1
+Content-Type: application/json
+Transfer-Encoding: chunked
+Connection: keep-alive
+Vary: Accept-Encoding
+Access-Control-Allow-Credentials: true
+Strict-Transport-Security: max-age=15724800; includeSubDomains
+Content-Encoding: br

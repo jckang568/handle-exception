@@ -15,7 +15,7 @@
 ---
 
 ## 2. 사전조사
-### 1. 체크 예외(Check Exception)와 언체크 예외/런타임 예외 (Uncheck Exception, Runtime Exception)의 차이
+### 2-1. 체크 예외(Check Exception)와 언체크 예외/런타임 예외 (Uncheck Exception, Runtime Exception)의 차이
 ```mermaid
      flowchart ^
      Throwable([Throwable]) --> Object([Object]):::Object
@@ -681,7 +681,17 @@ ExceptionHandler의 파라미터로 HttpServletRequest나 WebRequest 등을 얻�
   ```
 
 ---
+# 4. 정리
+스프링이 제공하는 ControllerAdvice는 여러가지 컨트롤러에서 발생 할 수 있는 예외들을 처리하고 통합적으로
+예외 처리 로직을 정의하기 윈한 어노테이션이다. 이를 사용함으로써 여러 컨트롤러에서 발생하는 예외들에 대한
+중앙 집중식 처리를 할 수 있고, 코드의 재사용성과 유지보수성을 향상시킬 수 있다.
+다음으로는 어노테이션에 대해서 알아봐야겠다. ControllerAdvice는 인터페이스로만 정의되어 있는데, 서블릿에서
+어떠한 방식으로 위임을 하는걸까? 추가적인 내용을 학습하고 링크를 추가하도록 하겠다.
+
+
+---
 ### 참고 링크
+  - https://github.com/hotire/spring-core
   - https://mangkyu.tistory.com/152
   - https://mangkyu.tistory.com/204
   - https://mangkyu.tistory.com/205

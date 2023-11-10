@@ -12,6 +12,6 @@ server:
 
 logging:
   level:
-    root: trace
-    org.apache.tomcat: INFO
-    org.apache.tomcat.util.net: WARN
+    root: debug
+    org.apache.tomcat: info
+    org.apache.tomcat.util.net: warn
